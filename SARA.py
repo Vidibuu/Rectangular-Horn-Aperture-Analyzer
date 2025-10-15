@@ -294,7 +294,6 @@ TXT = {'en': {
         'univ_ylabel_db_norm': "Nivel (dB, normalizado)",
     }}
 
-
 # === UTILIDAD DE TEXTOS (TRADUCCIONES) ===
 def _T(lang, key):
     return TXT.get(lang, TXT['en']).get(key, TXT['en'].get(key, key))
@@ -304,7 +303,6 @@ st.set_page_config(page_title='SARA', page_icon=_logo_img(), layout='wide')
 
 # === ESTILOS GLOBALES (CSS) ===
 st.markdown('\n    <style>\n    html, body, .stApp { background: #0b1220; color:#e5e7eb; }\n    .hero{background: linear-gradient(135deg,#0f172a,#0b1220 60%);border:1px solid #1f2937;border-radius:20px;padding:18px 22px;box-shadow:0 1px 2px rgba(0,0,0,.25);margin-bottom:0.75rem;}\n    .card{background:#111827;border-radius:16px;padding:1rem 1.25rem;border:1px solid #1f2937;box-shadow:0 1px 2px rgba(0,0,0,0.25);margin-bottom:0.75rem;}\n    .metric-big{font-size:2.0rem; font-weight:800; letter-spacing:-0.01em}\n    </style>\n    ', unsafe_allow_html=True)
-
 
 # === GESTIÓN DE ESTADO POR DEFECTO ===
 def _set_default(k, v):
@@ -478,7 +476,6 @@ with st.sidebar:
     st.session_state.a  = st.session_state.get('a_ui',  0.015) * (0.01 if st.session_state.units == 'cm' else 0.0254)
     st.session_state.b  = st.session_state.get('b_ui',  0.0075) * (0.01 if st.session_state.units == 'cm' else 0.0254)
 
-
     st.subheader(_T(st.session_state.lang, 'opt_design'))
     # --- Dynamic optimal values for toggle help (displayed in current units) ---
     try:
@@ -509,12 +506,10 @@ fc = c0 / (2.0 * st.session_state.a) / 1000000000.0 if st.session_state.a > 0 el
 if st.session_state.fGHz <= fc:
     st.error(_T(st.session_state.lang, 'cutoff_error').format(fc=fc))
 
-
 # === FUNCIONES AUXILIARES (FRESNEL) ===
 def CS_pair(x: float):
     Sx, Cx = fresnel(x)
     return (Cx, Sx)
-
 
 # === CÁLCULO DE DIRECTIVIDAD — BOCINA SECTORIAL E ===
 def compute_DE(lam, a, b1, rho1):
@@ -523,7 +518,6 @@ def compute_DE(lam, a, b1, rho1):
     v = b1 / np.sqrt(2.0 * lam * rho1)
     C, S = CS_pair(v)
     return 64.0 * a * rho1 / (np.pi * lam * b1) * (C ** 2 + S ** 2)
-
 
 # === CÁLCULO DE DIRECTIVIDAD — BOCINA SECTORIAL H ===
 def compute_DH(lam, a1, b, rho2):
@@ -616,7 +610,6 @@ else:
         st.markdown(f"<div class='metric-big'>{D_db:.2f} dB</div>", unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
-
 # === CÁLCULO EXACTO DEL PATRÓN 1D (PLANOS E/H) ===
 @st.cache_data(show_spinner=False)
 def compute_pattern_1d(plane: str, lam: float, a1_eff: float, b1_eff: float, lE: float, lH: float, N: int):
@@ -664,7 +657,6 @@ def compute_pattern_1d(plane: str, lam: float, a1_eff: float, b1_eff: float, lE:
     Pmax = P.max() if P.size and _np.max(P) > 0 else 1.0
     return (theta_deg, P / Pmax)
 
-
 # === ANCHO DE HAZ A -3 DB (HPBW) ===
 def _hpbw_from_db(x_deg, y_db):
     import numpy as _np
@@ -699,7 +691,6 @@ def hpbw_from_1d_same_method(plane: str, lam: float, a1_eff: float, b1_eff: floa
     return _hpbw_from_db(th_deg, patt_to_db(patt))
 # === /Added ===
 
-
 # === HPBW NUMÉRICO (MÉTODO ALTERNATIVO) ===
 def _hpbw_numeric(plane, lam, a1_eff, b1_eff, lE, lH):
     import numpy as _np
@@ -720,7 +711,6 @@ def _hpbw_numeric(plane, lam, a1_eff, b1_eff, lE, lH):
     th3 = x1 + (0.5 - y1) * (x2 - x1) / (y2 - y1)
     return 2.0 * float(th3)
 
-
 # === CURVA DE REFERENCIA PARA CORTES PRINCIPALES ===
 @st.cache_data(show_spinner=False)
 def compute_overlay_at_fixed_phi(plane: str, lam: float, a1_eff: float, b1_eff: float, lE: float, lH: float, a_feed: float, b_feed: float, N: int):
@@ -739,7 +729,6 @@ def compute_overlay_at_fixed_phi(plane: str, lam: float, a1_eff: float, b1_eff: 
     P = _np.abs(Et)**2 + _np.abs(Ep)**2
     P /= P.max() if P.size and _np.max(P) > 0 else 1.0
     return th_deg, P
-
 
 # === PATRÓN POLAR (0–360°) ===
 @st.cache_data(show_spinner=False)
@@ -790,7 +779,6 @@ def compute_pattern_polar(plane: str, lam: float, a1_eff: float, b1_eff: float, 
     Pmax = P.max() if P.size and _np.max(P) > 0 else 1.0
     return (phi, P / Pmax)
 import numpy as _np
-
 
 # === UTILIDADES DE CONVERSIÓN Y CURVAS UNIVERSALES ===
 def patt_to_db(p):
@@ -844,19 +832,16 @@ def _univ_H_db(t, x_vec):
     mag /= mag.max() if mag.max() > 0 else 1.0
     return 20.0 * _np.log10(_np.maximum(mag, 1e-12))
 
-
 # === FRESNEL: FUNCIÓN F(T1,T2) ===
 def fresnel_F(t1, t2):
     S1, C1 = fresnel(t1)
     S2, C2 = fresnel(t2)
     return C2 - C1 - 1j * (S2 - S1)
 
-
 # === SINC SEGURA ===
 def sinc_safe(x):
     x = np.asarray(x, dtype=float)
     return np.where(np.abs(x) < 1e-12, 1.0, np.sin(x) / x)
-
 
 # === CAMPO LEJANO — BOCINA SECTORIAL E (Φ ARBITRARIO) ===
 def fields_sectorial_E(theta, phi, lam, b1, rho1, a):
@@ -881,7 +866,6 @@ def fields_sectorial_E(theta, phi, lam, b1, rho1, a):
     Etheta = A * np.sin(ph)
     Ephi = A * np.cos(ph)
     return (Etheta, Ephi)
-
 
 # === CAMPO LEJANO — BOCINA SECTORIAL H (Φ ARBITRARIO) ===
 def fields_sectorial_H(theta, phi, lam, a1, rho2, b):
@@ -915,7 +899,6 @@ def fields_sectorial_H(theta, phi, lam, a1, rho2, b):
     Ephi = A * np.cos(ph)
     return (Etheta, Ephi)
 
-
 # === PATRÓN PARA Φ ARBITRARIO ===
 def pattern_arbitrary(tipo, lam, a1, b1, lE, lH, a, b, phi_deg, N=721):
     th_deg = np.linspace(-90.0, 90.0, N)
@@ -940,7 +923,7 @@ def pattern_arbitrary(tipo, lam, a1, b1, lE, lH, a, b, phi_deg, N=721):
 
 # === INTERFAZ — PESTAÑAS Y VISUALIZACIÓN DE RESULTADOS ===
 tabParams, tabPlots, tabUniv, tabArb = st.tabs([_T(st.session_state.lang, 'tabs_params'), _T(st.session_state.lang, 'tabs_plots'), _T(st.session_state.lang, 'tabs_univ'), _T(st.session_state.lang, 'tabs_arbitrary')])
-
+# --- Pestaña: Campo para un corte φ constante (phi cte) ---
 
 with tabArb:
     st.subheader(_T(st.session_state.lang, 'tabs_arbitrary'))
@@ -1737,6 +1720,87 @@ with tabArb:
             lam_val = lam * (100.0 if st.session_state.get('units','cm') == 'cm' else (1/0.0254))
             lam_suffix = 'cm' if st.session_state.get('units','cm') == 'cm' else 'in'
 
+# --- Pestaña: Parámetros de entrada (geometría, frecuencia, etc.) ---
+        st.caption(_T(st.session_state.lang, 'opt_caption'))
+with tabParams:
+        
+    s = b1_eff ** 2 / (8 * lam * st.session_state.lE) if lam > 0 and st.session_state.lE > 0 and (b1_eff > 0) else np.nan
+    t = a1_eff ** 2 / (8 * lam * st.session_state.lH) if lam > 0 and st.session_state.lH > 0 and (a1_eff > 0) else np.nan
+
+    # Solo mostrar s o t (según tipo) y la longitud de onda (alineados en la misma fila)
+
+    colL, colR = st.columns([2, 1])
+
+    with colL:
+
+        if st.session_state.tipo == 'Sectorial (Plano E)':
+
+            st.markdown(
+
+                f"<div style='font-size:26px; font-weight:700'>s = {s:.6f}</div>"
+
+                if np.isfinite(s) else
+
+                "<div style='font-size:26px; font-weight:700'>s = n/a</div>",
+
+                unsafe_allow_html=True
+
+            )
+
+        elif st.session_state.tipo == 'Sectorial (Plano H)':
+
+            st.markdown(
+
+                f"<div style='font-size:26px; font-weight:700'>t = {t:.6f}</div>"
+
+                if np.isfinite(t) else
+
+                "<div style='font-size:26px; font-weight:700'>t = n/a</div>",
+
+                unsafe_allow_html=True
+
+            )
+
+        else:
+
+            # Piramidal: muestra s y t
+
+                c1, c2 = st.columns(2)
+
+                with c1:
+
+                    st.markdown(
+
+                        f"<div style='font-size:26px; font-weight:700'>s = {s:.6f}</div>"
+
+                        if np.isfinite(s) else
+
+                        "<div style='font-size:26px; font-weight:700'>s = n/a</div>",
+
+                        unsafe_allow_html=True
+
+                    )
+
+                with c2:
+
+                    st.markdown(
+
+                        f"<div style='font-size:26px; font-weight:700'>t = {t:.6f}</div>"
+
+                        if np.isfinite(t) else
+
+                        "<div style='font-size:26px; font-weight:700'>t = n/a</div>",
+
+                        unsafe_allow_html=True
+
+                    )
+
+        with colR:
+
+            lam_val = lam * (100.0 if st.session_state.get('units','cm') == 'cm' else (1/0.0254))
+            lam_suffix = 'cm' if st.session_state.get('units','cm') == 'cm' else 'in'
+
+# --- Pestaña: Radiación plano E/H (patrones 1D y polares) ---
         st.caption(_T(st.session_state.lang, 'opt_caption'))
 with tabPlots:
     st.subheader(_T(st.session_state.lang, 'plots_title'))
@@ -1987,6 +2051,7 @@ with tabPlots:
                 with c1:
                     st.download_button(_T(st.session_state.lang, 'png_E' if plane == 'E' else 'png_H'), data=png, file_name=f'patron_{plane}.png', mime='image/png')
                 with c2:
+# --- Pestaña: Curvas universales (E/H) y evaluador puntual ---
                     st.download_button(_T(st.session_state.lang, 'csv_E' if plane == 'E' else 'csv_H'), data=csv, file_name=f'patron_{plane}.csv', mime='text/csv')
 with tabUniv:
     st.markdown("""
@@ -2115,66 +2180,67 @@ with tabUniv:
                 key=f"dl_univ_csv_{'E' if is_E else 'H'}_{__import__('uuid').uuid4().hex}"
             )
         # --- fin exportación ---
-    # === Evaluador puntual: dado s/t y x devuelve el campo normalizado ===
+
+    # === Evaluar valor puntual (campo normalizado) — resultado sólo en este render ===
+    if 'univ_eval_trigger' not in st.session_state:
+        st.session_state.univ_eval_trigger = False  # flag para mostrar el resultado solo en este render
+
     st.divider()
     st.subheader(_T(st.session_state.lang, 'univ_eval_title'))
 
-    with st.form('univ_eval_form', clear_on_submit=False):
+    with st.form('univ_eval_form', clear_on_submit=True):  # limpio inputs al pulsar Calcular
         c1, c2, c3 = st.columns([3, 3, 2])
         with c1:
             if is_E:
-                s_val = st.number_input(_T(st.session_state.lang, 'univ_eval_label_s'), min_value=0.0, value=0.25, step=0.01, format="%.5f", key='univ_eval_s')
+                s_val = st.number_input(_T(st.session_state.lang, 'univ_eval_label_s'),
+                                        min_value=0.0, value=0.25, step=0.01, format="%.5f",
+                                        key='univ_eval_s')
                 st.caption(_T(st.session_state.lang, 'univ_eval_caption_mode_E'))
             else:
-                t_val = st.number_input(_T(st.session_state.lang, 'univ_eval_label_t'), min_value=0.0, value=0.375, step=0.01, format="%.5f", key='univ_eval_t')
+                t_val = st.number_input(_T(st.session_state.lang, 'univ_eval_label_t'),
+                                        min_value=0.0, value=0.375, step=0.01, format="%.5f",
+                                        key='univ_eval_t')
                 st.caption(_T(st.session_state.lang, 'univ_eval_caption_mode_H'))
         with c2:
-            x_val = st.number_input(_T(st.session_state.lang, 'univ_eval_label_x'), min_value=0.0, value=1.00, step=0.05, format="%.5f", key='univ_eval_x')
+            x_val = st.number_input(_T(st.session_state.lang, 'univ_eval_label_x'),
+                                    min_value=0.0, value=1.00, step=0.01, format="%.5f",
+                                    key='univ_eval_x')
             st.caption(_T(st.session_state.lang, 'univ_eval_caption_x'))
         with c3:
-            st.write('')  # spacing
+            st.write('')
             calcular = st.form_submit_button(_T(st.session_state.lang, 'univ_eval_btn'))
 
-    
-if calcular:
-    import numpy as _np
-    try:
-        # Normalizamos igual que las curvas: sobre una malla densa de x
-        x_grid = _np.linspace(0.0, float(x_max_univ), 1201)
-        if is_E:
-            y_all = _univ_E_db(s_val, _np.concatenate([x_grid, _np.array([x_val])]))
-        else:
-            y_all = _univ_H_db(t_val, _np.concatenate([x_grid, _np.array([x_val])]))
-        y_db = float(y_all[-1])  # valor en x_val con la misma normalización que el gráfico
-        y_lin = 10.0 ** (y_db / 20.0)
+    # Guardo inputs y activo el trigger solo en el render del click
+    if calcular:
+        st.session_state.univ_eval_trigger = True
+        st.session_state.univ_eval_inputs = {
+            'is_E': bool(is_E),
+            's': float(s_val) if is_E else None,
+            't': float(t_val) if not is_E else None,
+            'x': float(x_val),
+        }
 
-        st.metric(_T(st.session_state.lang, 'univ_eval_metric_db'), f"{y_db:.3f} dB")
-        st.caption(_T(st.session_state.lang, 'univ_eval_ref'))
-    except Exception as e:
-        st.error(_T(st.session_state.lang, 'univ_eval_error').format(e=e))
+    # Muestro el resultado y limpio el trigger para que no persista al cambiar de pestaña
+    if st.session_state.univ_eval_trigger:
+        import numpy as _np
+        try:
+            x_grid = _np.linspace(0.0, float(x_max_univ), 1201)
+            _is_E = st.session_state.univ_eval_inputs['is_E']
+            _x    = st.session_state.univ_eval_inputs['x']
+            if _is_E:
+                _s = st.session_state.univ_eval_inputs['s']
+                y_all = _univ_E_db(_s, _np.concatenate([x_grid, _np.array([_x])]))
+            else:
+                _t = st.session_state.univ_eval_inputs['t']
+                y_all = _univ_H_db(_t, _np.concatenate([x_grid, _np.array([_x])]))
+            y_db  = float(y_all[-1])
+            st.metric(_T(st.session_state.lang, 'univ_eval_metric_db'), f"{y_db:.3f} dB")
+            st.caption(_T(st.session_state.lang, 'univ_eval_ref'))
+        except Exception as e:
+            st.error(_T(st.session_state.lang, 'univ_eval_error').format(e=e))
+        finally:
+            st.session_state.univ_eval_trigger = False
+            st.session_state.univ_eval_inputs = {}
+    # === Evaluador puntual: dado s/t y x devuelve el campo normalizado ===
+    st.divider()
 
-
-    else:
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots()
-        for v in vals if vals else []:
-            y = _univ_E_db(v, x) if is_E else _univ_H_db(v, x)
-            import numpy as np
-            if (y is None) or (len(y)==0) or np.all(np.isnan(y)):
-                continue
-            ax.plot(x, y, linewidth=2.0, label=f's={v:.3f}' if is_E else f't={v:.3f}')
-        ax.set_xlabel(_T(st.session_state.lang, 'univ_xlabel_E') if is_E else _T(st.session_state.lang, 'univ_xlabel_H'), color='black')
-        ax.set_ylabel('Nivel (dB, normalizado)', color='black')
-        ax.tick_params(axis='both', labelcolor='black')
-        ax.set_ylim(int(y_min_univ), 0)
-        ax.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
-        if vals:
-            leg = ax.legend()
-            [t.set_color('black') for t in leg.get_texts()]
-            leg.get_frame().set_facecolor('white')
-            leg.get_frame().set_edgecolor('#333333')
-            [t.set_color('black') for t in leg.get_texts()]
-            leg.get_frame().set_facecolor('white')
-            leg.get_frame().set_edgecolor('#333')
-        if vals:
-            pass  
