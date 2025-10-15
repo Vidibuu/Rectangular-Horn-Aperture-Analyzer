@@ -940,7 +940,726 @@ def pattern_arbitrary(tipo, lam, a1, b1, lE, lH, a, b, phi_deg, N=721):
 
 # === INTERFAZ — PESTAÑAS Y VISUALIZACIÓN DE RESULTADOS ===
 tabParams, tabPlots, tabUniv, tabArb = st.tabs([_T(st.session_state.lang, 'tabs_params'), _T(st.session_state.lang, 'tabs_plots'), _T(st.session_state.lang, 'tabs_univ'), _T(st.session_state.lang, 'tabs_arbitrary')])
-with tabParams:
+
+
+with tabArb:
+    st.subheader(_T(st.session_state.lang, 'tabs_arbitrary'))
+    # One row: left wide slider, right narrow radio (pushed right)
+    c_left, c_spacer, c_right = st.columns([6, 1, 3])
+    with c_left:
+        phi_sel = st.slider('φ (°)', min_value=0, max_value=180, value=90, key='phi_sel',
+                            help=_T(st.session_state.lang, 'phi_help') if 'phi_help' in TXT.get(st.session_state.lang, {}) else ('φ=0° → H ; φ=90° → E' if st.session_state.lang=='es' else 'φ=0° → H ; φ=90° → E'))
+    with c_right:
+        modo_plot = st.radio(_T(st.session_state.lang, 'mode'),
+                             options=[_T(st.session_state.lang, 'mode_1d'), _T(st.session_state.lang, 'mode_polar')],
+                             horizontal=True, index=0)
+    escala_sel = st.selectbox(_T(st.session_state.lang, 'scale_depth'), options=[-60, -50, -40, -30], index=2)
+    use_plotly = st.toggle(_T(st.session_state.lang, 'hover_enable'), value=True if PLOTLY_AVAILABLE else False, key='arb_plotly_toggle')
+    submitted = st.button(_T(st.session_state.lang, 'update_btn'), key='arb_update_btn')
+    if submitted:
+        N = 2096
+        escala_abs = abs(escala_sel)
+        if modo_plot == _T(st.session_state.lang, 'mode_1d'):
+            if st.session_state.tipo == 'Piramidal':
+                th_deg, P_E = pattern_arbitrary('Sectorial (Plano E)', lam, a1_eff, b1_eff, st.session_state.lE, st.session_state.lH, st.session_state.a, st.session_state.b, phi_sel, N)
+                _,     P_H = pattern_arbitrary('Sectorial (Plano H)', lam, a1_eff, b1_eff, st.session_state.lE, st.session_state.lH, st.session_state.a, st.session_state.b, phi_sel, N)
+                P_E = P_E / (P_E.max() if P_E.size and P_E.max() > 0 else 1.0)
+                P_H = P_H / (P_H.max() if P_H.size and P_H.max() > 0 else 1.0)
+                patt_db_E = patt_to_db(P_E); patt_db_H = patt_to_db(P_H)
+                if use_plotly and PLOTLY_AVAILABLE:
+                    fig = go.Figure()
+                    HPBW_Ea = _hpbw_from_db(th_deg.tolist(), patt_db_E.tolist())
+                    HPBW_Ha = _hpbw_from_db(th_deg.tolist(), patt_db_H.tolist())
+                    st.markdown(f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>HPBW E ≈ {HPBW_Ea:.2f}° · HPBW H ≈ {HPBW_Ha:.2f}°</div></div>", unsafe_allow_html=True)
+                    fig.add_trace(go.Scatter(x=th_deg.tolist(), y=patt_db_E.tolist(), mode='lines', name='E', line=dict(color='#000000', width=2), hovertemplate='θ=%{x:.2f}°<br>dB=%{y:.2f}<extra>E</extra>'))
+                    fig.add_trace(go.Scatter(x=th_deg.tolist(), y=patt_db_H.tolist(), mode='lines', name='H', line=dict(color='#1f77b4', width=2), hovertemplate='θ=%{x:.2f}°<br>dB=%{y:.2f}<extra>H</extra>'))
+                    fig.update_yaxes(range=[-escala_abs, 0.0], tickfont=dict(color='black'), title_font=dict(color='black'))
+                    fig.update_xaxes(range=[float(th_deg[0]), float(th_deg[-1])], title=_T(st.session_state.lang, 'xlabel_deg'))
+                    fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='#0f0f0f'), margin=dict(l=40, r=20, t=50, b=40), title=f'φ = {phi_sel}°')
+                    fig.update_xaxes(gridcolor='#e6e6e6', zeroline=True, zerolinecolor='#b0b0b0'); fig.update_yaxes(gridcolor='#e6e6e6', zeroline=True, zerolinecolor='#b0b0b0')
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+                else:
+                    fig_m, ax = plt.subplots()
+                    HPBW_Ea = _hpbw_from_db(th_deg, patt_db_E)
+                    HPBW_Ha = _hpbw_from_db(th_deg, patt_db_H)
+                    ax.plot(th_deg, patt_db_E, color='#000000', linewidth=2.0, label='E')
+                    ax.plot(th_deg, patt_db_H, color='#000000', linewidth=2.0, label='H')
+                    leg = ax.legend()
+                    [t.set_color('black') for t in leg.get_texts()]
+                    leg.get_frame().set_facecolor('white')
+                    leg.get_frame().set_edgecolor('#333333')
+                    ax.set_xlabel(_T(st.session_state.lang, 'xlabel_deg')); ax.set_ylabel(_T(st.session_state.lang, 'ylabel_norm'))
+                    ax.set_title(f'φ = {phi_sel}°'); ax.grid(True, linestyle='--', linewidth=0.6)
+                    st.pyplot(fig_m)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+            else:
+                th_deg, P = pattern_arbitrary(st.session_state.tipo, lam, a1_eff, b1_eff, st.session_state.lE, st.session_state.lH, st.session_state.a, st.session_state.b, phi_sel, N)
+                patt_db = patt_to_db(P)
+                if use_plotly and PLOTLY_AVAILABLE:
+                    fig = go.Figure()
+                    HPBW_1a = _hpbw_from_db(th_deg.tolist(), patt_db.tolist())
+                    st.markdown(f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>HPBW ≈ {HPBW_1a:.2f}°</div></div>", unsafe_allow_html=True)
+                    fig.add_trace(go.Scatter(x=th_deg.tolist(), y=patt_db.tolist(), mode='lines', line=dict(color='#000000', width=2), hovertemplate='θ=%{x:.2f}°<br>dB=%{y:.2f}<extra></extra>'))
+                    fig.update_yaxes(range=[-escala_abs, 0.0], tickfont=dict(color='black'), title_font=dict(color='black'))
+                    fig.update_xaxes(range=[float(th_deg[0]), float(th_deg[-1])], title=_T(st.session_state.lang, 'xlabel_deg'))
+                    fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='#0f0f0f'), margin=dict(l=40, r=20, t=50, b=40), title=f'φ = {phi_sel}°')
+                    fig.update_xaxes(gridcolor='#e6e6e6', zeroline=True, zerolinecolor='#b0b0b0'); fig.update_yaxes(gridcolor='#e6e6e6', zeroline=True, zerolinecolor='#b0b0b0')
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+                else:
+                    fig_m, ax = plt.subplots()
+
+                    HPBW_1a = _hpbw_from_db(th_deg, patt_db)
+                    st.markdown(f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>HPBW ≈ {HPBW_1a:.2f}°</div></div>", unsafe_allow_html=True)
+                    ax.plot(th_deg, patt_db, color='#000000', linewidth=2.0)
+                    ax.set_ylim(-escala_abs, 0.0); ax.set_xlim(th_deg[0], th_deg[-1])
+                    ax.set_xlabel(_T(st.session_state.lang, 'xlabel_deg')); ax.set_ylabel(_T(st.session_state.lang, 'ylabel_norm'))
+                    ax.set_title(f'φ = {phi_sel}°'); ax.grid(True, linestyle='--', linewidth=0.6)
+                    st.pyplot(fig_m)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+        else:
+            phi_plot = np.linspace(0.0, 360.0, 720)
+            theta_eval_deg = np.minimum(phi_plot, 360.0 - phi_plot)
+            th = np.deg2rad(theta_eval_deg)
+            ph = np.deg2rad(phi_sel)
+            if st.session_state.tipo == 'Piramidal':
+                EtE, EpE = fields_sectorial_E(th, ph, lam, b1_eff, st.session_state.lE, st.session_state.a)
+                EtH, EpH = fields_sectorial_H(th, ph, lam, a1_eff, st.session_state.lH, st.session_state.b)
+                P_E = (np.abs(EtE)**2 + np.abs(EpE)**2)
+                P_H = (np.abs(EtH)**2 + np.abs(EpH)**2)
+                P_E = P_E / (P_E.max() if P_E.size and P_E.max() > 0 else 1.0)
+                P_H = P_H / (P_H.max() if P_H.size and P_H.max() > 0 else 1.0)
+                rE = np.clip(-patt_to_db(P_E), 0.0, escala_abs)
+                rH = np.clip(-patt_to_db(P_H), 0.0, escala_abs)
+                # === Added (arbitrary polar): show HPBW banner using 1D method ===
+                try:
+                    HPBW_E_loc = hpbw_from_1d_same_method('E', lam, a1_eff, b1_eff, st.session_state.lE, st.session_state.lH)
+                    HPBW_H_loc = hpbw_from_1d_same_method('H', lam, a1_eff, b1_eff, st.session_state.lE, st.session_state.lH)
+                    st.markdown(
+                        f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>"
+                        f"{_T(st.session_state.lang, 'hpbw_e') if 'hpbw_e' in TXT.get(st.session_state.lang, {}) else 'HPBW E'} ≈ {HPBW_E_loc:.2f}° · "
+                        f"{_T(st.session_state.lang, 'hpbw_h') if 'hpbw_h' in TXT.get(st.session_state.lang, {}) else 'HPBW H'} ≈ {HPBW_H_loc:.2f}°"
+                        f"</div></div>",
+                        unsafe_allow_html=True
+                    )
+                except Exception as _ex:
+                    pass
+                # === /Added ===
+                if use_plotly and PLOTLY_AVAILABLE:
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(theta=phi_plot.tolist(), r=rE.tolist(), mode='lines', name='E', line=dict(color='#000000', width=2), hovertemplate='φ=%{theta:.1f}°<br>dB=%{customdata:.2f}<extra>E</extra>', customdata=(-rE).tolist()))
+                    fig.add_trace(go.Scatterpolar(theta=phi_plot.tolist(), r=rH.tolist(), mode='lines', name='H', line=dict(color='#1f77b4', width=2), hovertemplate='φ=%{theta:.1f}°<br>dB=%{customdata:.2f}<extra>H</extra>', customdata=(-rH).tolist()))
+                    tickvals = list(range(0, int(escala_abs) + 1, 10)); ticktext = [f'{-t}' for t in tickvals]
+                    fig.update_polars(radialaxis=dict(range=[escala_abs, 0], tickvals=tickvals, ticktext=ticktext, angle=90, showline=True), angularaxis=dict(direction='clockwise', rotation=90, tickmode='array', tickvals=list(range(0, 360, 30)), gridcolor='#e0e0e0', linecolor='#909090'))
+                    fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='black'), legend=dict(font=dict(color='black', size=13), bgcolor='white', bordercolor='#333', borderwidth=1), showlegend=True, margin=dict(l=40, r=20, t=50, b=40), title=f'φ = {phi_sel}°')
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+                else:
+                    fig_m = plt.figure()
+                    ax = fig_m.add_subplot(111, projection='polar')
+                    ax.set_theta_zero_location('N')
+                    ax.set_theta_direction(-1)
+                    HPBW_pE = _hpbw_from_db(phi_plot, rE)
+                    HPBW_pH = _hpbw_from_db(phi_plot, rH)
+                    ax.plot(np.deg2rad(phi_plot), rE, color='#000000', linewidth=2.0, label=f'E (HPBWφ≈{HPBW_pE:.2f}°)')
+                    ax.plot(np.deg2rad(phi_plot), rH, color='#000000', linewidth=2.0, label=f'H (HPBWφ≈{HPBW_pH:.2f}°)')
+                    leg = ax.legend(); [t.set_color('black') for t in leg.get_texts()]; leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                    ax.set_rlim(escala_abs, 0.0)
+                    ax.set_title(f'φ = {phi_sel}°'); ax.grid(True, linestyle='--', linewidth=0.6)
+                    st.pyplot(fig_m)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+            elif st.session_state.tipo == 'Sectorial (Plano E)':
+                Et, Ep = fields_sectorial_E(th, ph, lam, b1_eff, st.session_state.lE, st.session_state.a)
+                Pp = np.abs(Et)**2 + np.abs(Ep)**2
+                Pp /= Pp.max() if Pp.size and np.max(Pp) > 0 else 1.0
+                r = np.clip(-patt_to_db(Pp), 0.0, escala_abs)
+                # === Added: HPBW banner (plane based on selection) ===
+                try:
+                    plane = 'E' if st.session_state.tipo == 'Sectorial (Plano E)' else 'H'
+                    HPBW_loc = hpbw_from_1d_same_method(plane, lam, a1_eff, b1_eff, st.session_state.lE, st.session_state.lH)
+                    lbl = _T(st.session_state.lang, 'hpbw_e') if plane == 'E' else _T(st.session_state.lang, 'hpbw_h')
+                    if not lbl:
+                        lbl = f"HPBW {plane}"
+                    st.markdown(
+                        f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>"
+                        f"{lbl} ≈ {HPBW_loc:.2f}°"
+                        f"</div></div>",
+                        unsafe_allow_html=True
+                    )
+                except Exception as _ex:
+                    pass
+                # === /Added ===
+                if use_plotly and PLOTLY_AVAILABLE:
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(theta=phi_plot.tolist(), r=r.tolist(), mode='lines', line=dict(color='#000000', width=2), hovertemplate='φ=%{theta:.1f}°<br>dB=%{customdata:.2f}<extra></extra>', customdata=(-r).tolist()))
+                    tickvals = list(range(0, int(escala_abs) + 1, 10)); ticktext = [f'{-t}' for t in tickvals]
+                    fig.update_polars(radialaxis=dict(range=[escala_abs, 0], tickvals=tickvals, ticktext=ticktext, angle=90, showline=True), angularaxis=dict(direction='clockwise', rotation=90, tickmode='array', tickvals=list(range(0, 360, 30)), gridcolor='#e0e0e0', linecolor='#909090'))
+                    fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='black'), legend=dict(font=dict(color='black', size=13), bgcolor='white', bordercolor='#333', borderwidth=1), showlegend=True, margin=dict(l=40, r=20, t=50, b=40), title=f'φ = {phi_sel}°')
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+                else:
+                    fig_m = plt.figure()
+                    ax = fig_m.add_subplot(111, projection='polar')
+                    ax.set_theta_zero_location('N')
+                    ax.set_theta_direction(-1)
+                    HPBW_p1 = _hpbw_from_db(phi_plot, r)
+                    st.markdown(f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>HPBWφ ≈ {HPBW_p1:.2f}°</div></div>", unsafe_allow_html=True)
+                    ax.plot(np.deg2rad(phi_plot), r, color='#000000', linewidth=2.0)
+                    ax.set_rlim(escala_abs, 0.0)
+                    ax.set_title(f'φ = {phi_sel}°'); ax.grid(True, linestyle='--', linewidth=0.6)
+                    st.pyplot(fig_m)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+            else:  # Sectorial (Plano H)
+                Et, Ep = fields_sectorial_H(th, ph, lam, a1_eff, st.session_state.lH, st.session_state.b)
+                Pp = np.abs(Et)**2 + np.abs(Ep)**2
+                Pp /= Pp.max() if Pp.size and np.max(Pp) > 0 else 1.0
+                r = np.clip(-patt_to_db(Pp), 0.0, escala_abs)
+                # === Added: HPBW banner (plane based on selection) ===
+                try:
+                    plane = 'E' if st.session_state.tipo == 'Sectorial (Plano E)' else 'H'
+                    HPBW_loc = hpbw_from_1d_same_method(plane, lam, a1_eff, b1_eff, st.session_state.lE, st.session_state.lH)
+                    lbl = _T(st.session_state.lang, 'hpbw_e') if plane == 'E' else _T(st.session_state.lang, 'hpbw_h')
+                    if not lbl:
+                        lbl = f"HPBW {plane}"
+                    st.markdown(
+                        f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>"
+                        f"{lbl} ≈ {HPBW_loc:.2f}°"
+                        f"</div></div>",
+                        unsafe_allow_html=True
+                    )
+                except Exception as _ex:
+                    pass
+                # === /Added ===
+                if use_plotly and PLOTLY_AVAILABLE:
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(theta=phi_plot.tolist(), r=r.tolist(), mode='lines', line=dict(color='#000000', width=2), hovertemplate='φ=%{theta:.1f}°<br>dB=%{customdata:.2f}<extra></extra>', customdata=(-r).tolist()))
+                    tickvals = list(range(0, int(escala_abs) + 1, 10)); ticktext = [f'{-t}' for t in tickvals]
+                    fig.update_polars(radialaxis=dict(range=[escala_abs, 0], tickvals=tickvals, ticktext=ticktext, angle=90, showline=True), angularaxis=dict(direction='clockwise', rotation=90, tickmode='array', tickvals=list(range(0, 360, 30)), gridcolor='#e0e0e0', linecolor='#909090'))
+                    fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='black'), legend=dict(font=dict(color='black', size=13), bgcolor='white', bordercolor='#333', borderwidth=1), showlegend=True, margin=dict(l=40, r=20, t=50, b=40), title=f'φ = {phi_sel}°')
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---
+
+                else:
+                    fig_m = plt.figure()
+                    ax = fig_m.add_subplot(111, projection='polar')
+                    ax.set_theta_zero_location('N')
+                    ax.set_theta_direction(-1)
+                    HPBW_p1 = _hpbw_from_db(phi_plot, r)
+                    st.markdown(f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>HPBWφ ≈ {HPBW_p1:.2f}°</div></div>", unsafe_allow_html=True)
+                    ax.plot(np.deg2rad(phi_plot), r, color='#000000', linewidth=2.0)
+                    ax.set_rlim(escala_abs, 0.0)
+                    ax.set_title(f'φ = {phi_sel}°'); ax.grid(True, linestyle='--', linewidth=0.6)
+                    st.pyplot(fig_m)
+
+                    # --- Exportación (PNG + CSV) Cortes arbitrarios ---
+                    import io
+                    import pandas as pd
+                    import matplotlib.pyplot as _plt
+                    csv_bytes = None; png_bytes = None
+                    try:
+                        if 'patt_db_E' in locals() and 'patt_db_H' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['E_dB'] = patt_db_E; df['H_dB'] = patt_db_H
+                            series_to_plot = ('theta_deg', [('E', patt_db_E), ('H', patt_db_H)])
+                        elif 'patt_db' in locals() and 'th_deg' in locals():
+                            df = pd.DataFrame({'theta_deg': th_deg}); df['pattern_dB'] = patt_db
+                            series_to_plot = ('theta_deg', [('pattern', patt_db)])
+                        elif 'rE' in locals() and 'rH' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['E_dB'] = rE; df['H_dB'] = rH
+                            series_to_plot = ('phi_deg', [('E', rE), ('H', rH)])
+                        elif 'r' in locals() and 'phi_plot' in locals():
+                            df = pd.DataFrame({'phi_deg': phi_plot}); df['pattern_dB'] = r
+                            series_to_plot = ('phi_deg', [('pattern', r)])
+                        else:
+                            raise RuntimeError('No exportable data')
+                        _csv_buf = io.BytesIO(); _csv_buf.write(df.to_csv(index=False).encode('utf-8')); _csv_buf.seek(0); csv_bytes = _csv_buf
+                        fig_export, ax_export = _plt.subplots(subplot_kw={'projection': 'polar'} if series_to_plot[0]=='phi_deg' else {})
+                        x_axis = phi_plot if series_to_plot[0]=='phi_deg' else th_deg
+                        for _lab, _yy in series_to_plot[1]:
+                            if series_to_plot[0]=='phi_deg':
+                                ax_export.plot(np.deg2rad(x_axis), _yy, linewidth=2.0, label=_lab); ax_export.set_rlim(abs(escala_sel), 0.0)
+                            else:
+                                ax_export.plot(x_axis, _yy, linewidth=2.0, label=_lab); ax_export.set_ylim(-abs(escala_sel), 0.0)
+                        if series_to_plot[0]=='phi_deg':
+                            ax_export.set_title(f'φ = {phi_sel}°')
+                        else:
+                            ax_export.set_xlabel(_T(st.session_state.lang, 'xlabel_deg') if 'xlabel_deg' in TXT.get(st.session_state.lang, {}) else 'θ (°)')
+                            ax_export.set_ylabel(_T(st.session_state.lang, 'ylabel_norm') if 'ylabel_norm' in TXT.get(st.session_state.lang, {}) else 'Nivel (dB, normalizado)')
+                        ax_export.grid(True, linestyle='--', linewidth=0.6, color='#dddddd')
+                        if len(series_to_plot[1]) > 1:
+                            leg = ax_export.legend(); [t.set_color('black') for t in leg.get_texts()]
+                            leg.get_frame().set_facecolor('white'); leg.get_frame().set_edgecolor('#333333')
+                        _png_buf = io.BytesIO(); fig_export.savefig(_png_buf, format='png', dpi=160, bbox_inches='tight'); _png_buf.seek(0); png_bytes = _png_buf
+                        _plt.close(fig_export)
+                    
+                    except Exception as _ex:
+                        csv_bytes = None; png_bytes = None
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if png_bytes is not None:
+                            st.download_button('Descargar PNG', data=png_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.png', mime='image/png', key=f'arb_png_{phi_sel}')
+                    with c2:
+                        if csv_bytes is not None:
+                            st.download_button('Descargar CSV', data=csv_bytes, file_name=f'corte_arbitrario_phi_{phi_sel}.csv', mime='text/csv', key=f'arb_csv_{phi_sel}')
+                    # --- fin exportación ---with tabParams:
         
     s = b1_eff ** 2 / (8 * lam * st.session_state.lE) if lam > 0 and st.session_state.lE > 0 and (b1_eff > 0) else np.nan
     t = a1_eff ** 2 / (8 * lam * st.session_state.lH) if lam > 0 and st.session_state.lH > 0 and (a1_eff > 0) else np.nan
@@ -1458,5 +2177,4 @@ if calcular:
             leg.get_frame().set_facecolor('white')
             leg.get_frame().set_edgecolor('#333')
         if vals:
-            pass  # (plot oculto)
-            # st.pyplot(fig, use_container_width=True)  # ocultado a petición del usuario
+            pass  
