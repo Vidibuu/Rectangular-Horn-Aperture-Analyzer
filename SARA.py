@@ -960,6 +960,17 @@ with tabArb:
                     fig.update_xaxes(range=[float(th_deg[0]), float(th_deg[-1])], title=_T(st.session_state.lang, 'xlabel_deg'))
                     fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='#0f0f0f'), margin=dict(l=40, r=20, t=50, b=40), title=f'φ = {phi_sel}°')
                     fig.update_xaxes(gridcolor='#e6e6e6', zeroline=True, zerolinecolor='#b0b0b0'); fig.update_yaxes(gridcolor='#e6e6e6', zeroline=True, zerolinecolor='#b0b0b0')
+                                        # -- enforce H traces as dark gray dashed (Plotly) --
+                    try:
+                        for _tr in fig.data:
+                            _ht = getattr(_tr, 'hovertemplate', '') or ''
+                            _nm = getattr(_tr, 'name', '') or ''
+                            if ('<extra>H<' in _ht) or (_nm in ('H','Plano H')):
+                                if hasattr(_tr, 'line') and _tr.line is not None:
+                                    _tr.line.color = '#444444'
+                                    _tr.line.dash = 'dash'
+                    except Exception:
+                        pass
                     st.plotly_chart(fig, use_container_width=True)
 
                     # --- Exportación (PNG + CSV) Cortes arbitrarios ---
@@ -1018,7 +1029,7 @@ with tabArb:
                     HPBW_Ea = _hpbw_from_db(th_deg, patt_db_E)
                     HPBW_Ha = _hpbw_from_db(th_deg, patt_db_H)
                     ax.plot(th_deg, patt_db_E, color='#000000', linewidth=2.0, label='E')
-                    ax.plot(th_deg, patt_db_H, color='#000000', linewidth=2.0, label='H')
+                    ax.plot(th_deg, patt_db_H, color='#444444', linestyle='--', linewidth=2.0, label='H')
                     leg = ax.legend()
                     [t.set_color('black') for t in leg.get_texts()]
                     leg.get_frame().set_facecolor('white')
@@ -1240,6 +1251,17 @@ with tabArb:
                     tickvals = list(range(0, int(escala_abs) + 1, 10)); ticktext = [f'{-t}' for t in tickvals]
                     fig.update_polars(radialaxis=dict(range=[escala_abs, 0], tickvals=tickvals, ticktext=ticktext, angle=90, showline=True), angularaxis=dict(direction='clockwise', rotation=90, tickmode='array', tickvals=list(range(0, 360, 30)), gridcolor='#e0e0e0', linecolor='#909090'))
                     fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='black'), legend=dict(font=dict(color='black', size=13), bgcolor='white', bordercolor='#333', borderwidth=1), showlegend=True, margin=dict(l=40, r=20, t=50, b=40), title=f'φ = {phi_sel}°')
+                                        # -- enforce H traces as dark gray dashed (Plotly) --
+                    try:
+                        for _tr in fig.data:
+                            _ht = getattr(_tr, 'hovertemplate', '') or ''
+                            _nm = getattr(_tr, 'name', '') or ''
+                            if ('<extra>H<' in _ht) or (_nm in ('H','Plano H')):
+                                if hasattr(_tr, 'line') and _tr.line is not None:
+                                    _tr.line.color = '#444444'
+                                    _tr.line.dash = 'dash'
+                    except Exception:
+                        pass
                     st.plotly_chart(fig, use_container_width=True)
 
                     # --- Exportación (PNG + CSV) Cortes arbitrarios ---
@@ -1844,6 +1866,18 @@ with tabPlots:
                     fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='black'), legend=dict(font=dict(color='black', size=13), bgcolor='white', bordercolor='#333', borderwidth=1), showlegend=True, height=520, margin=dict(l=40, r=20, t=50, b=40), title=_T(st.session_state.lang, 'title_1dE').replace('— Plano E', '— Piramidal: E & H'))
                     fig.update_xaxes(gridcolor='#e6e6e6', zeroline=True, zerolinecolor='#b0b0b0', tickfont=dict(color='#0f0f0f', size=12), ticks='outside', tickcolor='#444', ticklen=5, linecolor='#444', showline=True, title_font=dict(color='#0f0f0f'))
                     fig.update_yaxes(gridcolor='#e6e6e6', zeroline=True, zerolinecolor='#b0b0b0', tickfont=dict(color='#0f0f0f', size=12), ticks='outside', tickcolor='#444', ticklen=5, linecolor='#444', showline=True, title_font=dict(color='#0f0f0f'))
+                    
+                    # -- enforce H traces as dark gray dashed (Plotly) --
+                    try:
+                        for _tr in fig.data:
+                            _ht = getattr(_tr, 'hovertemplate', '') or ''
+                            _nm = getattr(_tr, 'name', '') or ''
+                            if ('<extra>H<' in _ht) or (_nm in ('H','Plano H')):
+                                if hasattr(_tr, 'line') and _tr.line is not None:
+                                    _tr.line.color = '#444444'
+                                    _tr.line.dash = 'dash'
+                    except Exception:
+                        pass
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     fig_m, ax = plt.subplots()
@@ -1866,7 +1900,7 @@ with tabPlots:
                 axE.set_ylim(-escala_abs, 0.0)
                 figH = plt.figure()
                 axH = figH.add_subplot(111)
-                axH.plot(thH, pattH_db, color='#1f77b4')
+                axH.plot(thH, pattH_db, color='#444444', linestyle='--')
                 axH.set_ylim(-escala_abs, 0.0)
                 pngE, csvE = export_assets(figE, thE, pattE, 'E')
                 pngH, csvH = export_assets(figH, thH, pattH, 'H')
@@ -1900,6 +1934,18 @@ with tabPlots:
                     ticktext = [f'{-t}' for t in tickvals]
                     fig.update_polars(radialaxis=dict(range=[escala_abs, 0], tickvals=tickvals, ticktext=ticktext, gridcolor='#e0e0e0', linecolor='#909090', tickfont=dict(color='#0f0f0f', size=12)), angularaxis=dict(direction='clockwise', rotation=90, tickmode='array', tickvals=list(range(0, 360, 30)), ticktext=[f'{t}°' for t in range(0, 360, 30)], gridcolor='#e0e0e0', linecolor='#909090', tickfont=dict(color='#0f0f0f', size=12)))
                     fig.update_layout(template='plotly_white', paper_bgcolor='white', plot_bgcolor='white', font=dict(color='black'), legend=dict(font=dict(color='black', size=13), bgcolor='white', bordercolor='#333', borderwidth=1), showlegend=True, height=520, margin=dict(l=40, r=20, t=50, b=40), title=_T(st.session_state.lang, 'title_polE').replace('— Plano E', '— Piramidal: E & H'))
+                    
+                    # -- enforce H traces as dark gray dashed (Plotly) --
+                    try:
+                        for _tr in fig.data:
+                            _ht = getattr(_tr, 'hovertemplate', '') or ''
+                            _nm = getattr(_tr, 'name', '') or ''
+                            if ('<extra>H<' in _ht) or (_nm in ('H','Plano H')):
+                                if hasattr(_tr, 'line') and _tr.line is not None:
+                                    _tr.line.color = '#444444'
+                                    _tr.line.dash = 'dash'
+                    except Exception:
+                        pass
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     fig_m = plt.figure()
@@ -1910,7 +1956,7 @@ with tabPlots:
                     HPBW_pH_main = _hpbw_from_db(phH, rH)
                     st.markdown(f"<div class='hero' style='margin-bottom:8px'><div style='font-weight:700'>HPBWφ E ≈ {HPBW_pE_main:.2f}° · HPBWφ H ≈ {HPBW_pH_main:.2f}°</div></div>", unsafe_allow_html=True)
                     ax.plot(np.deg2rad(phE), rE, color='black', linewidth=2.0, label='Plano E')
-                    ax.plot(np.deg2rad(phH), rH, color='#000000', linewidth=2.0, label='Plano H')
+                    ax.plot(np.deg2rad(phH), rH, color='#444444', linestyle='--', linewidth=2.0, label='Plano H')
                     ax.set_theta_zero_location('N')
                     ax.set_theta_direction(-1)
                     ax.set_rlim(escala_abs, 0.0)
@@ -1929,7 +1975,7 @@ with tabPlots:
                 axH = figH.add_subplot(111, projection='polar')
                 axH.set_theta_zero_location('N')
                 axH.set_theta_direction(-1)
-                axH.plot(np.deg2rad(phH), rH, color='#1f77b4')
+                axH.plot(np.deg2rad(phH), rH, color='#444444', linestyle='--')
                 axH.set_rlim(escala_abs, 0.0)
                 pngE, csvE = export_assets(figE, phE, pattE, 'E')
                 pngH, csvH = export_assets(figH, phH, pattH, 'H')
@@ -2243,4 +2289,3 @@ with tabUniv:
             st.session_state.univ_eval_inputs = {}
     # === Evaluador puntual: dado s/t y x devuelve el campo normalizado ===
     st.divider()
-
